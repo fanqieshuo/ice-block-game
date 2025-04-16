@@ -256,7 +256,7 @@
 </head>
 <body>
   <h1>冰块游戏</h1>
-  <p class="instructions">请拖动冰块到灰色空位。</p>
+  <p class="instructions">请拖动冰块到灰色空位。每个冰块只能移动1次，已移动的冰块（紫色）只能退回原位置。冰块可以跨过其他冰块或空位移动。</p>
   
   <div class="game-stats">
     <div class="stat-box">
@@ -291,6 +291,7 @@
     // 游戏状态
     let board = [];        // 0: 空位, 1: 冰块, 2: 原始位置(已移走冰块)
     let originalPositions = []; // 记录原始冰块位置
+    let iceBlocksOriginalPos = []; // 记录每个冰块的原始位置 {r, c, idx}
     let moved = [];        // 记录哪些冰块已被移动
     let moveCount = 0;     // 移动步数
     
@@ -318,6 +319,7 @@
       
       board = [];
       originalPositions = []; // 重置原始位置
+      iceBlocksOriginalPos = []; // 重置冰块原始位置数组
       moved = Array(ICE_COUNT * 2).fill(false);
       
       // 构建游戏板
@@ -330,6 +332,12 @@
             row.push(arr[idx]);
             // 记录初始冰块位置
             posRow.push(arr[idx] === 1 ? 1 : 0);
+            
+            // 如果当前位置是冰块，记录它的原始位置
+            if (arr[idx] === 1) {
+              iceBlocksOriginalPos.push({r, c, idx});
+            }
+            
             idx++;
           } else {
             row.push(0);
@@ -536,37 +544,48 @@
         return false;
       }
       
-      // 检查是否是滑行移动（沿直线滑动）
-      // 水平移动
-      if (fromR === toR) {
-        const step = fromC < toC ? 1 : -1; // 确定移动方向
-        for (let c = fromC + step; c !== toC; c += step) {
-          // 如果路径上有障碍物，则不能滑行
-          if (board[fromR][c] === 1) {
-            return false;
-          }
+      // 获取冰块的索引
+      const ice = document.querySelector(`.ice-block[data-row="${fromR}"][data-col="${fromC}"]`);
+      const iceIdx = parseInt(ice.dataset.idx);
+      
+      // 检查是否是已移动的冰块（紫色）
+      if (moved[iceIdx]) {
+        // 已移动的冰块只能返回到其原始位置
+        const originalPos = iceBlocksOriginalPos.find(pos => pos.idx === iceIdx);
+        if (!(toR === originalPos.r && toC === originalPos.c)) {
+          // 如果目标位置不是原始位置，则不允许移动
+          return false;
         }
-        return true;
       }
       
-      // 垂直移动
-      if (fromC === toC) {
-        const step = fromR < toR ? 1 : -1; // 确定移动方向
-        for (let r = fromR + step; r !== toR; r += step) {
-          // 如果路径上有障碍物，则不能滑行
-          if (board[r][fromC] === 1) {
-            return false;
-          }
-        }
-        return true;
-      }
-      
-      return false;
+      // 直接允许冰块跨过任何其他冰块或空位移动，无需检查路径上的障碍物
+      return true;
     }
     
     // 辅助函数：计算可能的目标位置
     function findPossibleMoves(r, c) {
       const possibleMoves = [];
+      
+      // 获取冰块的索引
+      const ice = document.querySelector(`.ice-block[data-row="${r}"][data-col="${c}"]`);
+      if (!ice) return possibleMoves;
+      
+      const iceIdx = parseInt(ice.dataset.idx);
+      
+      // 如果冰块已经移动过
+      if (moved[iceIdx]) {
+        // 已移动的冰块只能回到原位置
+        const originalPos = iceBlocksOriginalPos.find(pos => pos.idx === iceIdx);
+        if (originalPos && board[originalPos.r][originalPos.c] === 0) {
+          // 确认原位置是空的，并且可以直线滑行到那里
+          if (isValidMove(r, c, originalPos.r, originalPos.c)) {
+            possibleMoves.push({r: originalPos.r, c: originalPos.c});
+          }
+        }
+        return possibleMoves;
+      }
+      
+      // 对于未移动的冰块，执行正常的滑行规则
       
       // 向上滑行
       for (let nr = r - 1; nr >= 0; nr--) {
@@ -607,7 +626,16 @@
       // 交换位置
       board[toR][toC] = 1;
       board[fromR][fromC] = 0;
-      moved[idx] = true;
+      
+      // 判断是否是返回原位置的移动
+      const originalPos = iceBlocksOriginalPos.find(pos => pos.idx === idx);
+      if (originalPos && toR === originalPos.r && toC === originalPos.c) {
+        // 如果是返回原位置，标记为未移动
+        moved[idx] = false;
+      } else {
+        // 否则标记为已移动
+        moved[idx] = true;
+      }
       
       // 增加移动步数
       moveCount++;
