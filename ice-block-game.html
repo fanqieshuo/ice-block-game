@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>冰块游戏演示</title>
+  <style>
+    body {
+      background: #f5f7fa;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', 'PingFang SC', Arial, sans-serif;
+      touch-action: manipulation;
+    }
+    h1 {
+      margin-bottom: 16px;
+      color: #3a3a3a;
+    }
+    .game-board {
+      display: grid;
+      grid-template-columns: repeat(4, 80px);
+      grid-template-rows: repeat(3, 80px);
+      gap: 16px;
+      background: #e0e0e0;
+      padding: 24px;
+      border-radius: 18px;
+      box-shadow: 0 8px 32px rgba(80,120,200,0.10);
+      margin-bottom: 24px;
+      position: relative;
+    }
+    .cell {
+      width: 80px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      perspective: 200px;
+    }
+    .ice-block {
+      width: 68px;
+      height: 68px;
+      background: linear-gradient(145deg, #e6f7ff 60%, #aeefff 100%);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px #b3e0ff, 0 2px 0 #b3e0ff inset, 0 0 0 2px #b3e0ff inset;
+      border: 2px solid #aeefff;
+      transition: transform 0.2s, background 0.3s, box-shadow 0.3s;
+      position: relative;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+    }
+    .ice-block.dragging {
+      cursor: grabbing;
+      transform: scale(1.05);
+      z-index: 10;
+    }
+    .ice-block.moved {
+      background: linear-gradient(145deg, #f3e6ff 60%, #d1b3ff 100%);
+      box-shadow: 0 4px 12px #d1b3ff, 0 2px 0 #d1b3ff inset, 0 0 0 2px #d1b3ff inset;
+      border: 2px solid #d1b3ff;
+    }
+    .ice-block::after {
+      content: '';
+      display: block;
+      position: absolute;
+      left: 10px; right: 10px; top: 10px; bottom: 10px;
+      border-radius: 8px;
+      background: linear-gradient(120deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.1) 100%);
+      pointer-events: none;
+    }
+    .empty {
+      width: 68px;
+      height: 68px;
+      background: linear-gradient(145deg, #f0f0f0 60%, #e0e0e0 100%);
+      border-radius: 12px;
+      box-shadow: 0 2px 8px #cccccc;
+      border: 2px dashed #cccccc;
+    }
+    .original-position {
+      width: 68px;
+      height: 68px;
+      background: linear-gradient(145deg, #666666 60%, #555555 100%);
+      border-radius: 12px;
+      box-shadow: 0 2px 8px #444444;
+      border: 2px dashed #555555;
+    }
+    .win-message {
+      color: #6c4fd1;
+      font-size: 1.3em;
+      margin-top: 10px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      background: #f3e6ff;
+      padding: 10px 24px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px #d1b3ff33;
+      display: none;
+    }
+    .restart-btn {
+      background: #aeefff;
+      color: #3a3a3a;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 24px;
+      font-size: 1em;
+      cursor: pointer;
+      box-shadow: 0 2px 8px #b3e0ff44;
+      margin-top: 18px;
+      transition: background 0.2s;
+    }
+    .restart-btn:hover {
+      background: #d1b3ff;
+      color: #fff;
+    }
+    .instructions {
+      color: #666;
+      margin-bottom: 20px;
+      font-size: 0.9em;
+      text-align: center;
+    }
+    .game-stats {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+      margin-bottom: 15px;
+    }
+    .stat-box {
+      background: #ffffff;
+      padding: 5px 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .stat-label {
+      font-size: 0.9em;
+      color: #666;
+    }
+    .stat-value {
+      font-size: 1.5em;
+      font-weight: bold;
+      color: #3a3a3a;
+    }
+    /* 弹窗样式 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+    .modal-content {
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      max-width: 80%;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      text-align: center;
+      transform: scale(0.8);
+      transition: transform 0.3s;
+    }
+    .modal-overlay.active .modal-content {
+      transform: scale(1);
+    }
+    .modal-title {
+      font-size: 1.8em;
+      color: #6c4fd1;
+      margin-bottom: 10px;
+    }
+    .modal-message {
+      font-size: 1.3em;
+      margin-bottom: 20px;
+      color: #3a3a3a;
+    }
+    .modal-button {
+      background: #d1b3ff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 24px;
+      font-size: 1em;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      transition: background 0.2s;
+    }
+    .modal-button:hover {
+      background: #6c4fd1;
+    }
+    .confetti {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background-color: #d1b3ff;
+      border-radius: 50%;
+      opacity: 0.8;
+      animation: fall 3s ease-in-out infinite;
+    }
+    @keyframes fall {
+      0% { transform: translateY(-100px) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+    }
+    @media (max-width: 600px) {
+      .game-board {
+        grid-template-columns: repeat(4, 48px);
+        grid-template-rows: repeat(3, 48px);
+        gap: 8px;
+        padding: 8px;
+      }
+      .cell, .ice-block, .empty, .original-position {
+        width: 48px !important;
+        height: 48px !important;
+      }
+    }
+    .highlight-possible {
+      box-shadow: 0 0 0 3px #aeefff, 0 0 12px 5px rgba(0, 200, 255, 0.5) !important;
+    }
+    .possible-target {
+      position: relative;
+    }
+    /* 添加滑行轨迹动画 */
+    @keyframes slide-effect {
+      0% { 
+        transform: scale(1); 
+        opacity: 1;
+      }
+      100% { 
+        transform: scale(0.8); 
+        opacity: 0.2;
+      }
+    }
+    .slide-trace {
+      position: absolute;
+      width: 60%;
+      height: 60%;
+      background-color: rgba(174, 239, 255, 0.5);
+      border-radius: 12px;
+      z-index: 0;
+      animation: slide-effect 0.5s ease-out forwards;
+    }
+  </style>
+</head>
+<body>
+  <h1>冰块游戏</h1>
+  <p class="instructions">请拖动冰块到灰色空位。</p>
+  
+  <div class="game-stats">
+    <div class="stat-box">
+      <div class="stat-label">移动步数</div>
+      <div class="stat-value" id="move-counter">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">冰块数量</div>
+      <div class="stat-value" id="ice-counter">6</div>
+    </div>
+  </div>
+  
+  <div class="game-board" id="game-board"></div>
+  <div class="win-message" id="win-message">🎉 恭喜你，全部冰块已归位！</div>
+  <button class="restart-btn" id="restart-btn">重新开始</button>
+  
+  <!-- 胜利弹窗 -->
+  <div class="modal-overlay" id="win-modal">
+    <div class="modal-content">
+      <div class="modal-title">游戏胜利！</div>
+      <div class="modal-message" id="win-steps-message">你太棒了，你只用了0步！</div>
+      <button class="modal-button" id="modal-restart-btn">再来一局</button>
+    </div>
+  </div>
+  
+  <script>
+    // 配置
+    const ROWS = 3;
+    const COLS = 4;
+    const ICE_COUNT = 6; // 冰块数量 6-8个
+
+    // 游戏状态
+    let board = [];        // 0: 空位, 1: 冰块, 2: 原始位置(已移走冰块)
+    let originalPositions = []; // 记录原始冰块位置
+    let moved = [];        // 记录哪些冰块已被移动
+    let moveCount = 0;     // 移动步数
+    
+    let draggedIce = null;
+    let dragStartPos = { r: -1, c: -1 };
+    let draggedIdx = -1;
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function initBoard() {
+      // 重置状态
+      moveCount = 0;
+      document.getElementById('move-counter').textContent = moveCount;
+      document.getElementById('ice-counter').textContent = ICE_COUNT;
+      
+      // 生成初始数组 (1: 冰块, 0: 空位)
+      let arr = Array(ICE_COUNT).fill(1).concat(Array(ICE_COUNT).fill(0));
+      shuffle(arr);
+      
+      board = [];
+      originalPositions = []; // 重置原始位置
+      moved = Array(ICE_COUNT * 2).fill(false);
+      
+      // 构建游戏板
+      let idx = 0;
+      for (let r = 0; r < ROWS; r++) {
+        let row = [];
+        let posRow = [];
+        for (let c = 0; c < COLS; c++) {
+          if (idx < arr.length) {
+            row.push(arr[idx]);
+            // 记录初始冰块位置
+            posRow.push(arr[idx] === 1 ? 1 : 0);
+            idx++;
+          } else {
+            row.push(0);
+            posRow.push(0);
+          }
+        }
+        board.push(row);
+        originalPositions.push(posRow);
+      }
+    }
+
+    function renderBoard() {
+      const boardDiv = document.getElementById('game-board');
+      boardDiv.innerHTML = '';
+      let idx = 0;
+      
+      // 移除所有高亮
+      document.querySelectorAll('.highlight-possible').forEach(el => {
+        el.classList.remove('highlight-possible');
+      });
+      
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+          
+          if (board[r][c] === 1) {
+            // 渲染冰块
+            const ice = document.createElement('div');
+            ice.className = 'ice-block' + (moved[idx] ? ' moved' : '');
+            ice.title = moved[idx] ? '已移动' : '可移动';
+            ice.dataset.idx = idx;
+            ice.dataset.row = r;
+            ice.dataset.col = c;
+            ice.draggable = true;
+            
+            // 添加拖拽事件
+            ice.addEventListener('dragstart', (e) => onDragStart(e, r, c, idx));
+            ice.addEventListener('dragend', onDragEnd);
+            
+            // 添加触摸事件支持
+            ice.addEventListener('touchstart', (e) => onTouchStart(e, r, c, idx));
+            ice.addEventListener('touchmove', onTouchMove);
+            ice.addEventListener('touchend', onTouchEnd);
+            
+            // 添加鼠标悬停效果，显示可能的滑行位置
+            ice.addEventListener('mouseenter', () => {
+              showPossibleMoves(r, c);
+            });
+            
+            ice.addEventListener('mouseleave', () => {
+              hidePossibleMoves();
+            });
+            
+            cell.appendChild(ice);
+          } else {
+            // 渲染空位或原始位置
+            const empty = document.createElement('div');
+            if (originalPositions[r][c] === 1 && board[r][c] === 0) {
+              // 这是一个原始冰块位置，现在是空的
+              empty.className = 'original-position possible-target';
+            } else {
+              empty.className = 'empty possible-target';
+            }
+            empty.dataset.row = r;
+            empty.dataset.col = c;
+            
+            // 添加放置区域事件
+            cell.addEventListener('dragover', allowDrop);
+            cell.addEventListener('drop', (e) => onDrop(e, r, c));
+            
+            cell.appendChild(empty);
+          }
+          boardDiv.appendChild(cell);
+          idx++;
+        }
+      }
+      
+      // 为整个棋盘添加触摸事件处理
+      const gameBoard = document.getElementById('game-board');
+      gameBoard.addEventListener('touchmove', (e) => {
+        if (draggedIce) {
+          e.preventDefault(); // 防止页面滚动
+        }
+      }, { passive: false });
+    }
+    
+    // 拖拽事件处理
+    function onDragStart(e, r, c, idx) {
+      draggedIce = e.target;
+      dragStartPos = { r, c };
+      draggedIdx = idx;
+      setTimeout(() => {
+        draggedIce.classList.add('dragging');
+      }, 0);
+      
+      // 设置拖拽数据
+      e.dataTransfer.setData('text/plain', `${r},${c},${idx}`);
+      e.dataTransfer.effectAllowed = 'move';
+    }
+    
+    function allowDrop(e) {
+      e.preventDefault();
+    }
+    
+    function onDrop(e, r, c) {
+      e.preventDefault();
+      // 只允许上下左右移动，不能斜向移动
+      if (isValidMove(dragStartPos.r, dragStartPos.c, r, c)) {
+        moveIce(dragStartPos.r, dragStartPos.c, r, c, draggedIdx);
+      }
+    }
+    
+    function onDragEnd() {
+      if (draggedIce) {
+        draggedIce.classList.remove('dragging');
+        draggedIce = null;
+      }
+    }
+    
+    // 触摸事件处理
+    function onTouchStart(e, r, c, idx) {
+      const touch = e.touches[0];
+      draggedIce = e.target;
+      dragStartPos = { r, c };
+      draggedIdx = idx;
+      
+      draggedIce.classList.add('dragging');
+      
+      // 记录初始触摸位置
+      draggedIce.dataset.initialX = touch.clientX;
+      draggedIce.dataset.initialY = touch.clientY;
+      
+      e.preventDefault();
+    }
+    
+    function onTouchMove(e) {
+      if (!draggedIce) return;
+      
+      const touch = e.touches[0];
+      const initialX = parseInt(draggedIce.dataset.initialX);
+      const initialY = parseInt(draggedIce.dataset.initialY);
+      
+      const currentX = touch.clientX;
+      const currentY = touch.clientY;
+      
+      // 计算移动距离
+      const deltaX = currentX - initialX;
+      const deltaY = currentY - initialY;
+      
+      // 设置拖动元素位置
+      draggedIce.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.05)`;
+      
+      e.preventDefault();
+    }
+    
+    function onTouchEnd(e) {
+      if (!draggedIce) return;
+      
+      // 计算最终位置
+      const rect = draggedIce.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      
+      // 查找元素所在位置
+      const elements = document.elementsFromPoint(centerX, centerY);
+      
+      let targetCell = null;
+      for (const element of elements) {
+        if (element.classList.contains('cell')) {
+          targetCell = element;
+          break;
+        }
+      }
+      
+      if (targetCell) {
+        const r = parseInt(targetCell.dataset.row);
+        const c = parseInt(targetCell.dataset.col);
+        
+        // 检查是否是可滑行的空位
+        if (board[r][c] === 0 && isValidMove(dragStartPos.r, dragStartPos.c, r, c)) {
+          moveIce(dragStartPos.r, dragStartPos.c, r, c, draggedIdx);
+        }
+      }
+      
+      // 重置样式
+      draggedIce.style.transform = '';
+      draggedIce.classList.remove('dragging');
+      draggedIce = null;
+      
+      e.preventDefault();
+    }
+    
+    function isValidMove(fromR, fromC, toR, toC) {
+      // 仅允许同一行或同一列移动
+      if (!(fromR === toR || fromC === toC)) {
+        return false;
+      }
+      
+      // 确保目标位置是空位
+      if (board[toR][toC] !== 0) {
+        return false;
+      }
+      
+      // 检查是否是滑行移动（沿直线滑动）
+      // 水平移动
+      if (fromR === toR) {
+        const step = fromC < toC ? 1 : -1; // 确定移动方向
+        for (let c = fromC + step; c !== toC; c += step) {
+          // 如果路径上有障碍物，则不能滑行
+          if (board[fromR][c] === 1) {
+            return false;
+          }
+        }
+        return true;
+      }
+      
+      // 垂直移动
+      if (fromC === toC) {
+        const step = fromR < toR ? 1 : -1; // 确定移动方向
+        for (let r = fromR + step; r !== toR; r += step) {
+          // 如果路径上有障碍物，则不能滑行
+          if (board[r][fromC] === 1) {
+            return false;
+          }
+        }
+        return true;
+      }
+      
+      return false;
+    }
+    
+    // 辅助函数：计算可能的目标位置
+    function findPossibleMoves(r, c) {
+      const possibleMoves = [];
+      
+      // 向上滑行
+      for (let nr = r - 1; nr >= 0; nr--) {
+        if (board[nr][c] === 1) break; // 遇到另一个冰块则停止
+        if (board[nr][c] === 0) {
+          possibleMoves.push({r: nr, c});
+        }
+      }
+      
+      // 向下滑行
+      for (let nr = r + 1; nr < ROWS; nr++) {
+        if (board[nr][c] === 1) break; // 遇到另一个冰块则停止
+        if (board[nr][c] === 0) {
+          possibleMoves.push({r: nr, c});
+        }
+      }
+      
+      // 向左滑行
+      for (let nc = c - 1; nc >= 0; nc--) {
+        if (board[r][nc] === 1) break; // 遇到另一个冰块则停止
+        if (board[r][nc] === 0) {
+          possibleMoves.push({r, c: nc});
+        }
+      }
+      
+      // 向右滑行
+      for (let nc = c + 1; nc < COLS; nc++) {
+        if (board[r][nc] === 1) break; // 遇到另一个冰块则停止
+        if (board[r][nc] === 0) {
+          possibleMoves.push({r, c: nc});
+        }
+      }
+      
+      return possibleMoves;
+    }
+    
+    function moveIce(fromR, fromC, toR, toC, idx) {
+      // 交换位置
+      board[toR][toC] = 1;
+      board[fromR][fromC] = 0;
+      moved[idx] = true;
+      
+      // 增加移动步数
+      moveCount++;
+      document.getElementById('move-counter').textContent = moveCount;
+      
+      renderBoard();
+      checkWin();
+    }
+
+    function checkWin() {
+      // 胜利条件：没有浅灰色空位（所有非原始位置的空位都被填满）
+      let emptyNonOriginalSpaces = 0;
+      
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          // 如果是空位(0)但不是原始冰块位置
+          if (board[r][c] === 0 && originalPositions[r][c] === 0) {
+            emptyNonOriginalSpaces++;
+          }
+        }
+      }
+      
+      // 如果没有空的非原始位置，则胜利
+      if (emptyNonOriginalSpaces === 0) {
+        showWinModal();
+      }
+    }
+    
+    function showWinModal() {
+      // 更新胜利信息
+      document.getElementById('win-steps-message').textContent = `你太棒了，你只用了${moveCount}步！`;
+      
+      // 显示胜利消息
+      document.getElementById('win-message').style.display = 'block';
+      
+      // 显示弹窗
+      const modal = document.getElementById('win-modal');
+      modal.classList.add('active');
+      
+      // 创建庆祝彩花
+      createConfetti();
+    }
+    
+    function createConfetti() {
+      const container = document.querySelector('.modal-overlay');
+      
+      for (let i = 0; i < 50; i++) {
+        const confetti = document.createElement('div');
+        confetti.className = 'confetti';
+        
+        // 随机位置、颜色和延迟
+        const left = Math.random() * 100 + 'vw';
+        const delay = Math.random() * 3 + 's';
+        const colors = ['#aeefff', '#d1b3ff', '#ff9a9e', '#fad0c4', '#a18cd1'];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        
+        confetti.style.left = left;
+        confetti.style.animationDelay = delay;
+        confetti.style.backgroundColor = color;
+        
+        container.appendChild(confetti);
+        
+        // 动画结束后移除
+        setTimeout(() => {
+          confetti.remove();
+        }, 5000);
+      }
+    }
+    
+    // 重新开始游戏
+    function restartGame() {
+      const modal = document.getElementById('win-modal');
+      modal.classList.remove('active');
+      document.getElementById('win-message').style.display = 'none';
+      
+      // 清除所有彩花
+      document.querySelectorAll('.confetti').forEach(el => el.remove());
+      
+      initBoard();
+      renderBoard();
+    }
+
+    document.getElementById('restart-btn').onclick = restartGame;
+    document.getElementById('modal-restart-btn').onclick = restartGame;
+
+    // 显示可能的滑行位置
+    function showPossibleMoves(r, c) {
+      hidePossibleMoves(); // 先清除之前的高亮
+      
+      const possibleMoves = findPossibleMoves(r, c);
+      possibleMoves.forEach(move => {
+        const targetCell = document.querySelector(`.cell[data-row="${move.r}"][data-col="${move.c}"] > div`);
+        if (targetCell) {
+          targetCell.classList.add('highlight-possible');
+        }
+      });
+    }
+    
+    // 隐藏可能的滑行位置高亮
+    function hidePossibleMoves() {
+      document.querySelectorAll('.highlight-possible').forEach(el => {
+        el.classList.remove('highlight-possible');
+      });
+    }
+
+    // 初始化
+    initBoard();
+    renderBoard();
+  </script>
+</body>
+</html> 
