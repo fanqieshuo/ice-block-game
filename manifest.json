@@ -2,19 +2,19 @@
   "name": "冰块滑行游戏",
   "short_name": "冰块游戏",
   "description": "一个经典的冰块滑行游戏",
-  "start_url": "ice-block-game.html",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#f5f7fa",
   "theme_color": "#aeefff",
   "icons": [
     {
-      "src": "icons/icon-192x192.png",
+      "src": "./icons/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icons/icon-512x512.png",
+      "src": "./icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
