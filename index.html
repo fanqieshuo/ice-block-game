@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>冰块游戏</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        h1 {
+            color: #3a3a3a;
+            margin-bottom: 30px;
+        }
+        .game-container {
+            margin-top: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4a6cf7;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-top: 20px;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #3451b2;
+        }
+        .description {
+            margin: 20px 0;
+            line-height: 1.6;
+            text-align: left;
+        }
+        ul {
+            text-align: left;
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>冰块游戏</h1>
+        <div class="game-container">
+            <p>这是一个简单的HTML5冰块滑行游戏。</p>
+            <div class="description">
+                <h2>游戏规则</h2>
+                <ul>
+                    <li>请拖动冰块到灰色空位</li>
+                    <li>每个冰块只能移动1次</li>
+                    <li>已移动的冰块（紫色）只能退回原位置</li>
+                    <li>冰块可以跨过其他冰块或空位移动</li>
+                    <li>游戏目标是填满所有非原始位置的空格</li>
+                </ul>
+            </div>
+            <a href="ice-block-game.html" class="btn">开始游戏</a>
+        </div>
+    </div>
+</body>
+</html> 
