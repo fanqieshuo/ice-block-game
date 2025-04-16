@@ -55,12 +55,13 @@
     .ice-block.dragging {
       cursor: grabbing;
       transform: scale(1.05);
-      z-index: 10;
+      z-index: 100;
     }
     .ice-block.moved {
-      background: linear-gradient(145deg, #f3e6ff 60%, #d1b3ff 100%);
-      box-shadow: 0 4px 12px #d1b3ff, 0 2px 0 #d1b3ff inset, 0 0 0 2px #d1b3ff inset;
-      border: 2px solid #d1b3ff;
+      background: linear-gradient(145deg, #ff8fa8 60%, #ff0044 100%);
+      box-shadow: 0 4px 12px #ff0044, 0 2px 0 #ff0044 inset, 0 0 0 2px #ff0044 inset;
+      border: 2px solid #ff0044;
+      animation: pulse 1s ease-in-out;
     }
     .ice-block::after {
       content: '';
@@ -252,11 +253,16 @@
       z-index: 0;
       animation: slide-effect 0.5s ease-out forwards;
     }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
   </style>
 </head>
 <body>
   <h1>冰块游戏</h1>
-  <p class="instructions">请拖动冰块到灰色空位。每个冰块只能移动1次，已移动的冰块（紫色）只能退回原位置。冰块可以跨过其他冰块或空位移动。</p>
+  <p class="instructions">请拖动冰块到灰色空位。每个冰块只能移动1次，已移动的冰块（粉红色）只能退回原位置。冰块可以跨过其他冰块或空位移动。</p>
   
   <div class="game-stats">
     <div class="stat-box">
@@ -359,6 +365,46 @@
         el.classList.remove('highlight-possible');
       });
       
+      // 临时储存冰块的当前位置与索引映射关系
+      const currentIcePositions = [];
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (board[r][c] === 1) {
+            // 找到该位置冰块对应的索引
+            let foundIdx = -1;
+            
+            // 首先尝试找到是否是原位置的冰块
+            const originalIdx = iceBlocksOriginalPos.findIndex(pos => pos.r === r && pos.c === c);
+            if (originalIdx !== -1 && !moved[iceBlocksOriginalPos[originalIdx].idx]) {
+              // 在原位置且未移动过
+              foundIdx = iceBlocksOriginalPos[originalIdx].idx;
+            } else {
+              // 不是原位置或已移动过，则需要从moved数组中查找
+              // 这里不依赖顺序，确保每个冰块状态都正确保存
+              for (let i = 0; i < iceBlocksOriginalPos.length; i++) {
+                const pos = iceBlocksOriginalPos[i];
+                if (moved[pos.idx] && board[pos.r][pos.c] === 0) {
+                  // 这个冰块已经移动，但我们需要确认它移到了当前位置
+                  // 此处逻辑可能需要更复杂的判断
+                  foundIdx = pos.idx;
+                  break;
+                }
+              }
+              
+              // 如果还是找不到，则使用当前索引
+              if (foundIdx === -1) {
+                foundIdx = idx;
+              }
+            }
+            
+            currentIcePositions.push({r, c, idx: foundIdx});
+          }
+          idx++;
+        }
+      }
+      
+      // 重新渲染游戏板
+      idx = 0;
       for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
           const cell = document.createElement('div');
@@ -369,19 +415,36 @@
           if (board[r][c] === 1) {
             // 渲染冰块
             const ice = document.createElement('div');
-            ice.className = 'ice-block' + (moved[idx] ? ' moved' : '');
-            ice.title = moved[idx] ? '已移动' : '可移动';
-            ice.dataset.idx = idx;
+            
+            // 获取当前位置冰块的索引
+            const icePosition = currentIcePositions.find(pos => pos.r === r && pos.c === c);
+            const currentIdx = icePosition ? icePosition.idx : idx;
+            
+            // 创建基本冰块
+            ice.className = 'ice-block';
+            
+            // 检查这个索引的冰块是否已经移动过
+            // 通过直接查找冰块的原始位置是否与当前位置不同，或者moved数组标记
+            const originalPos = iceBlocksOriginalPos.find(pos => pos.idx === currentIdx);
+            const isAtOriginalPos = originalPos && originalPos.r === r && originalPos.c === c;
+            
+            if (moved[currentIdx] || (originalPos && !isAtOriginalPos)) {
+              ice.classList.add('moved');
+              console.log('渲染移动过的冰块:', r, c, currentIdx);
+            }
+            
+            ice.title = moved[currentIdx] ? '已移动' : '可移动';
+            ice.dataset.idx = currentIdx;
             ice.dataset.row = r;
             ice.dataset.col = c;
             ice.draggable = true;
             
             // 添加拖拽事件
-            ice.addEventListener('dragstart', (e) => onDragStart(e, r, c, idx));
+            ice.addEventListener('dragstart', (e) => onDragStart(e, r, c, currentIdx));
             ice.addEventListener('dragend', onDragEnd);
             
             // 添加触摸事件支持
-            ice.addEventListener('touchstart', (e) => onTouchStart(e, r, c, idx));
+            ice.addEventListener('touchstart', (e) => onTouchStart(e, r, c, currentIdx));
             ice.addEventListener('touchmove', onTouchMove);
             ice.addEventListener('touchend', onTouchEnd);
             
@@ -548,7 +611,7 @@
       const ice = document.querySelector(`.ice-block[data-row="${fromR}"][data-col="${fromC}"]`);
       const iceIdx = parseInt(ice.dataset.idx);
       
-      // 检查是否是已移动的冰块（紫色）
+      // 检查是否是已移动的冰块（粉红色）
       if (moved[iceIdx]) {
         // 已移动的冰块只能返回到其原始位置
         const originalPos = iceBlocksOriginalPos.find(pos => pos.idx === iceIdx);
@@ -622,18 +685,58 @@
       return possibleMoves;
     }
     
+    // 强制刷新冰块状态
+    function updateIceBlockStatus(fromR, fromC, toR, toC, idx) {
+      console.log('更新冰块状态:', fromR, fromC, '到', toR, toC, '索引:', idx);
+      
+      const originalPosition = iceBlocksOriginalPos.find(pos => pos.idx === idx);
+      
+      if (originalPosition) {
+        if (toR === originalPosition.r && toC === originalPosition.c) {
+          // 冰块回到原位
+          console.log('冰块回到原位');
+          moved[idx] = false;
+        } else {
+          // 冰块移动到新位置
+          console.log('冰块移动到新位置');
+          moved[idx] = true;
+        }
+      }
+      
+      // 获取移动后的冰块元素
+      setTimeout(() => {
+        const iceElement = document.querySelector(`.ice-block[data-row="${toR}"][data-col="${toC}"]`);
+        if (iceElement) {
+          // 强制更新类名
+          if (moved[idx]) {
+            iceElement.classList.add('moved');
+            iceElement.title = '已移动';
+          } else {
+            iceElement.classList.remove('moved');
+            iceElement.title = '可移动';
+          }
+        }
+      }, 50);
+    }
+    
     function moveIce(fromR, fromC, toR, toC, idx) {
+      console.log('移动冰块:', fromR, fromC, '到', toR, toC, '索引:', idx);
+      
       // 交换位置
       board[toR][toC] = 1;
       board[fromR][fromC] = 0;
       
-      // 判断是否是返回原位置的移动
+      // 确定移动状态
       const originalPos = iceBlocksOriginalPos.find(pos => pos.idx === idx);
+      
+      // 判断是否是返回原位置的移动
       if (originalPos && toR === originalPos.r && toC === originalPos.c) {
         // 如果是返回原位置，标记为未移动
+        console.log('冰块回到原位置');
         moved[idx] = false;
       } else {
         // 否则标记为已移动
+        console.log('冰块移动到新位置');
         moved[idx] = true;
       }
       
@@ -641,7 +744,28 @@
       moveCount++;
       document.getElementById('move-counter').textContent = moveCount;
       
+      // 重新渲染游戏板
       renderBoard();
+      
+      // 添加额外的视觉反馈 - 移动后高亮冰块
+      setTimeout(() => {
+        const movedIce = document.querySelector(`.ice-block[data-row="${toR}"][data-col="${toC}"]`);
+        if (movedIce) {
+          // 确保冰块显示正确的样式
+          if (moved[idx]) {
+            movedIce.classList.add('moved');
+          } else {
+            movedIce.classList.remove('moved');
+          }
+          
+          // 添加短暂的缩放效果
+          movedIce.style.transform = 'scale(1.1)';
+          setTimeout(() => {
+            movedIce.style.transform = '';
+          }, 300);
+        }
+      }, 50);
+      
       checkWin();
     }
 
