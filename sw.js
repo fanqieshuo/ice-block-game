@@ -1,7 +1,7 @@
 // 缓存名称和要缓存的文件
-const CACHE_NAME = 'ice-block-game-cache-v4';
+const CACHE_NAME = 'ice-block-game-cache-v5';
 const urlsToCache = [
-  '/',
+  './',
   './index.html',
   './ice-block-game.html',
   './manifest.json',
